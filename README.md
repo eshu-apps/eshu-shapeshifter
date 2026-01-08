@@ -26,6 +26,44 @@ Currently in active development. Core features complete, undergoing extensive te
 - 🔍 **System Validation**: Check migration compatibility before transforming
 - 🎨 **Gorgeous Setups**: Beautiful, pre-configured desktop environments
 
+## 💰 Pricing
+
+### 🆓 Free Trial
+- **2 FREE shapeshifts** to test the tool
+- No credit card required
+- Full feature access
+
+### Choose Your Plan
+
+**💎 Unlimited Monthly - $5.99/month**
+- ♾️ Unlimited shapeshifts
+- 🔄 Try as many distros as you want
+- ❌ Cancel anytime
+- 💪 Perfect for distro hoppers & developers
+
+**📦 Shift Packs - $3.99 per pack**
+- 📦 10 shapeshifts per purchase
+- 💰 One-time payment
+- ⏰ Never expires
+- 📚 Stack multiple packs
+- 🎯 Best for occasional users
+
+**[Get Eshu Shapeshifter →](https://gumroad.com/l/eshu-shapeshifter)**
+
+### Activating Your License
+
+After purchasing, activate your license:
+
+```bash
+sudo eshu-shapeshifter activate YOUR_LICENSE_KEY
+```
+
+Check your license status anytime:
+
+```bash
+sudo eshu-shapeshifter license
+```
+
 ## 🚀 Installation
 
 ### From Source (Recommended)
@@ -64,6 +102,12 @@ sudo eshu-shapeshifter scan
 
 # List available distributions
 sudo eshu-shapeshifter list
+
+# Check your license status
+sudo eshu-shapeshifter license
+
+# Activate a license key (after purchase)
+sudo eshu-shapeshifter activate YOUR_LICENSE_KEY
 
 # Validate if migration is possible
 sudo eshu-shapeshifter validate arch

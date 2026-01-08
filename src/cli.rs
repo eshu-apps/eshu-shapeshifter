@@ -49,4 +49,17 @@ pub enum Commands {
         /// Target distribution to validate
         target: String,
     },
+
+    /// Activate a license key
+    Activate {
+        /// Gumroad license key
+        license_key: String,
+
+        /// Product permalink (e.g., 'eshu-shapeshifter-unlimited' or 'eshu-shapeshifter-pack')
+        #[arg(short, long, default_value = "eshu-shapeshifter-unlimited")]
+        product: String,
+    },
+
+    /// Show license status and usage
+    License,
 }
