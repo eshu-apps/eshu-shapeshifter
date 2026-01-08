@@ -28,19 +28,84 @@ pub async fn scan_system() -> anyhow::Result<()> {
 
 /// Show current system status
 pub async fn show_status() -> anyhow::Result<()> {
+    use crate::license::LicenseInfo;
+
+    // Exciting header
+    println!();
+    println!("{}", "═══════════════════════════════════════════════════════════".cyan());
+    println!("{}", "    🔮 ESHU SHAPESHIFTER - LINUX DISTRO TRANSFORMER    ".cyan().bold());
+    println!("{}", "═══════════════════════════════════════════════════════════".cyan());
+    println!();
+
+    // Show what Shapeshifter can do
+    println!("{}", "✨ What Shapeshifter Does:".green().bold());
+    println!("   • {} - Transform between ANY Linux distribution", "Seamless Migration".yellow());
+    println!("   • {} - Automatic snapshots before every transformation", "Safe & Reversible".yellow());
+    println!("   • {} - Translate packages between distros intelligently", "Smart Package Mapping".yellow());
+    println!("   • {} - Preserve your data, apps, and configurations", "Keep Your Soul".yellow());
+    println!();
+
+    // Load and display license info
+    let license_info = LicenseInfo::load()?;
+    let remaining = license_info.get_shifts_remaining();
+
+    match &license_info.license_type {
+        crate::license::LicenseType::FreeTrial => {
+            println!("{} {}", "License:".cyan(), "Free Trial".yellow());
+            println!("{} {}/{} ({})", "Shapeshifts:".cyan(),
+                license_info.shifts_used, 2,
+                format!("{} remaining", remaining).green());
+            println!();
+
+            if remaining > 0 {
+                println!("{}", "💡 Quick Start:".yellow().bold());
+                println!("   1. Run: {} to scan your system", "sudo eshu-shapeshifter scan".white());
+                println!("   2. Run: {} to see available distros", "sudo eshu-shapeshifter list".white());
+                println!("   3. Run: {} to transform!", "sudo eshu-shapeshifter shapeshift <distro>".white());
+                println!("   4. Enjoy {} and consider upgrading!", format!("{} more free shapeshifts", remaining).green());
+            } else {
+                println!("{}", "🔒 Trial Limit Reached".yellow().bold());
+                println!("   Run {} to activate a license", "sudo eshu-shapeshifter activate <key>".white());
+                println!("   Purchase: https://gumroad.com/l/eshu-shapeshifter");
+            }
+            println!();
+        }
+        crate::license::LicenseType::Subscription { .. } => {
+            println!("{} {}", "License:".cyan(), "✅ Unlimited Subscription".green().bold());
+            println!("{} {}", "Shapeshifts Used:".cyan(), license_info.shifts_used);
+            println!();
+            println!("{}", "🎉 Thank you for supporting Eshu Shapeshifter!".green());
+            println!("   Transform as many times as you want!");
+            println!();
+        }
+        crate::license::LicenseType::ShiftPack { shifts_remaining, .. } => {
+            println!("{} {}", "License:".cyan(), "Shift Pack".white());
+            println!("{} {}", "Shapeshifts Remaining:".cyan(),
+                format!("{}", shifts_remaining).green().bold());
+            println!("{} {}", "Shapeshifts Used:".cyan(), license_info.shifts_used);
+            println!();
+        }
+    }
+
+    println!("{}", "═══════════════════════════════════════════════════════════".dim());
+    println!();
+
+    // Show system state if available
     let config = EshuConfig::load()?;
     let state_path = config.data_dir.join("current_state.json");
-    
+
     if !state_path.exists() {
-        println!("{}", "⚠️  No system state found. Run 'scan' first.".yellow());
+        println!("{}", "ℹ️  No system scan found yet.".yellow());
+        println!("   Run {} to scan your current system", "sudo eshu-shapeshifter scan".white());
+        println!();
         return Ok(());
     }
-    
+
     let content = fs::read_to_string(state_path)?;
     let state: SystemState = serde_json::from_str(&content)?;
-    
+
     display_system_info(&state);
-    
+
     // Show transformation history
     let history_path = config.data_dir.join("history.json");
     if history_path.exists() {
@@ -48,7 +113,7 @@ pub async fn show_status() -> anyhow::Result<()> {
         let history_content = fs::read_to_string(history_path)?;
         if let Ok(history) = serde_json::from_str::<Vec<TransformationRecord>>(&history_content) {
             for record in history.iter().rev().take(5) {
-                println!("  {} → {} ({})", 
+                println!("  {} → {} ({})",
                     record.from_distro.yellow(),
                     record.to_distro.green(),
                     record.timestamp
@@ -56,7 +121,7 @@ pub async fn show_status() -> anyhow::Result<()> {
             }
         }
     }
-    
+
     Ok(())
 }
 
