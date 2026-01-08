@@ -1,0 +1,96 @@
+# Kali Linux Distribution Profile
+# Standard penetration testing distribution
+
+name = "Kali Linux"
+version = "2024.1"
+family = "Debian"
+
+[package_manager]
+name = "apt"
+install_cmd = "apt install -y"
+remove_cmd = "apt remove -y"
+update_cmd = "apt update && apt upgrade -y"
+search_cmd = "apt search"
+list_installed_cmd = "dpkg -l"
+
+init_system = "Systemd"
+
+base_packages = [
+    "kali-linux-core",
+    "kali-linux-default",
+    "kali-tools-top10",
+    "linux-image-amd64",
+    "network-manager",
+    "grub2",
+    "sudo",
+    "vim",
+    "git",
+    "curl",
+    "wget",
+]
+
+# Essential Kali security tools
+security_packages = [
+    "nmap",
+    "metasploit-framework",
+    "burpsuite",
+    "wireshark",
+    "aircrack-ng",
+    "john",
+    "hashcat",
+    "sqlmap",
+    "nikto",
+    "hydra",
+    "gobuster",
+    "ffuf",
+    "netcat-traditional",
+    "tcpdump",
+    "masscan",
+    "enum4linux",
+    "smbclient",
+    "crackmapexec",
+    "responder",
+    "impacket-scripts",
+]
+
+# Desktop environment
+desktop_packages = [
+    "kali-desktop-xfce",
+    "xfce4",
+    "xfce4-goodies",
+    "lightdm",
+    "firefox-esr",
+    "qterminal",
+]
+
+pre_migration_hooks = [
+    "wget -q -O - https://archive.kali.org/archive-key.asc | apt-key add -",
+    "echo 'deb http://http.kali.org/kali kali-rolling main contrib non-free non-free-firmware' > /etc/apt/sources.list",
+    "apt update",
+]
+
+post_migration_hooks = [
+    "systemctl enable NetworkManager",
+    "systemctl enable lightdm",
+    "update-grub",
+    "update-initramfs -u",
+    "usermod -aG sudo $SUDO_USER",
+]
+
+[config_paths]
+network = "/etc/NetworkManager/"
+services = "/etc/systemd/system/"
+users = "/etc/passwd"
+tools = "/usr/share/kali-tools/"
+
+[package_mappings]
+# Arch to Kali
+"python" = "python3"
+"python-pip" = "python3-pip"
+"nmap" = "nmap"
+"wireshark-qt" = "wireshark"
+
+[features]
+description = "Full Kali Linux penetration testing environment"
+includes_tools = true
+security_focused = true

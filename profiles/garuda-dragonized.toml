@@ -1,0 +1,184 @@
+# Garuda Linux Dragonized Gaming Edition Profile
+# Ultimate gaming and performance-focused Arch derivative
+
+name = "Garuda Dragonized"
+version = "rolling"
+family = "Arch"
+
+[package_manager]
+name = "pacman"
+install_cmd = "pacman -S --noconfirm"
+remove_cmd = "pacman -R --noconfirm"
+update_cmd = "pacman -Syu --noconfirm"
+search_cmd = "pacman -Ss"
+list_installed_cmd = "pacman -Q"
+
+init_system = "Systemd"
+
+base_packages = [
+    "base",
+    "linux-zen",
+    "linux-zen-headers",
+    "linux-firmware",
+    "base-devel",
+    "networkmanager",
+    "grub",
+    "sudo",
+    "vim",
+    "git",
+]
+
+# KDE Plasma Dragonized
+desktop_packages = [
+    "plasma-meta",
+    "kde-applications-meta",
+    "sddm",
+    "konsole",
+    "dolphin",
+    "kate",
+    "spectacle",
+    "gwenview",
+    "ark",
+    "okular",
+    "kdeconnect",
+    "plasma-wayland-session",
+]
+
+# Garuda-specific tools
+garuda_packages = [
+    "garuda-settings-manager",
+    "timeshift",
+    "timeshift-autosnap",
+    "snapper",
+    "snap-pac",
+    "grub-btrfs",
+]
+
+# Performance and gaming
+performance_packages = [
+    "gamemode",
+    "lib32-gamemode",
+    "mangohud",
+    "lib32-mangohud",
+    "goverlay",
+    "corectrl",
+    "cpu-x",
+    "ananicy-cpp",
+    "irqbalance",
+    "preload",
+]
+
+# Gaming essentials
+gaming_packages = [
+    "steam",
+    "lutris",
+    "wine-staging",
+    "wine-gecko",
+    "wine-mono",
+    "winetricks",
+    "lib32-vulkan-icd-loader",
+    "vulkan-tools",
+    "lib32-mesa",
+    "lib32-nvidia-utils",
+    "protonup-qt",
+    "heroic-games-launcher-bin",
+]
+
+# Beautiful themes and customization
+theme_packages = [
+    "sweet-kde-theme-git",
+    "beautyline",
+    "papirus-icon-theme",
+    "kvantum",
+    "latte-dock",
+    "plasma-browser-integration",
+    "kde-rounded-corners",
+]
+
+# Fonts
+font_packages = [
+    "ttf-jetbrains-mono-nerd",
+    "ttf-fira-code",
+    "noto-fonts",
+    "noto-fonts-emoji",
+    "noto-fonts-cjk",
+    "ttf-ms-fonts",
+]
+
+# Audio
+audio_packages = [
+    "pipewire",
+    "pipewire-alsa",
+    "pipewire-pulse",
+    "pipewire-jack",
+    "lib32-pipewire",
+    "wireplumber",
+    "easyeffects",
+    "pavucontrol",
+]
+
+# Utilities
+utility_packages = [
+    "btop",
+    "fastfetch",
+    "fish",
+    "starship",
+    "eza",
+    "bat",
+    "ripgrep",
+    "fd",
+    "fzf",
+    "zoxide",
+]
+
+pre_migration_hooks = [
+    "pacman-key --init",
+    "pacman-key --populate archlinux",
+    # Add Chaotic-AUR for Garuda packages
+    "pacman-key --recv-key 3056513887B78AEB --keyserver keyserver.ubuntu.com",
+    "pacman-key --lsign-key 3056513887B78AEB",
+    "pacman -U 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-keyring.pkg.tar.zst' 'https://cdn-mirror.chaotic.cx/chaotic-aur/chaotic-mirrorlist.pkg.tar.zst' --noconfirm",
+    "echo '[chaotic-aur]' >> /etc/pacman.conf",
+    "echo 'Include = /etc/pacman.d/chaotic-mirrorlist' >> /etc/pacman.conf",
+]
+
+post_migration_hooks = [
+    "systemctl enable NetworkManager",
+    "systemctl enable bluetooth",
+    "systemctl enable sddm",
+    "systemctl enable fstrim.timer",
+    "systemctl enable irqbalance",
+    "systemctl enable ananicy-cpp",
+    "systemctl --user enable pipewire",
+    "systemctl --user enable wireplumber",
+    "mkinitcpio -P",
+    "grub-mkconfig -o /boot/grub/grub.cfg",
+    # Performance tweaks
+    "echo 'vm.swappiness=10' >> /etc/sysctl.d/99-swappiness.conf",
+    "echo 'vm.vfs_cache_pressure=50' >> /etc/sysctl.d/99-swappiness.conf",
+]
+
+[config_paths]
+network = "/etc/systemd/network/"
+services = "/etc/systemd/system/"
+users = "/etc/passwd"
+plasma = "~/.config/plasma-workspace/"
+
+[package_mappings]
+"python3" = "python"
+"python3-pip" = "python-pip"
+
+[features]
+description = "Garuda Linux Dragonized - Ultimate gaming and performance"
+desktop = "KDE Plasma (Dragonized)"
+kernel = "Linux Zen"
+gaming = true
+performance_optimized = true
+snapshot_support = true
+theme = "Sweet Dark"
+
+[performance_tweaks]
+kernel = "zen"
+scheduler = "ananicy"
+io_scheduler = "bfq"
+cpu_governor = "performance"

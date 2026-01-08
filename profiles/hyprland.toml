@@ -1,0 +1,156 @@
+# Hyprland Distribution Profile
+# Beautiful Wayland compositor on Arch base with stunning aesthetics
+
+name = "Hyprland"
+version = "rolling"
+family = "Arch"
+
+[package_manager]
+name = "pacman"
+install_cmd = "pacman -S --noconfirm"
+remove_cmd = "pacman -R --noconfirm"
+update_cmd = "pacman -Syu --noconfirm"
+search_cmd = "pacman -Ss"
+list_installed_cmd = "pacman -Q"
+
+init_system = "Systemd"
+
+base_packages = [
+    "base",
+    "linux",
+    "linux-firmware",
+    "base-devel",
+    "networkmanager",
+    "grub",
+    "sudo",
+    "vim",
+    "git",
+]
+
+# Hyprland core packages
+hyprland_packages = [
+    "hyprland",
+    "hyprpaper",
+    "hyprlock",
+    "hypridle",
+    "xdg-desktop-portal-hyprland",
+    "qt5-wayland",
+    "qt6-wayland",
+    "polkit-kde-agent",
+]
+
+# Beautiful UI components
+ui_packages = [
+    "waybar",
+    "rofi-wayland",
+    "dunst",
+    "kitty",
+    "thunar",
+    "thunar-archive-plugin",
+    "gvfs",
+    "gvfs-mtp",
+    "file-roller",
+    "swww",
+    "swaync",
+    "wlogout",
+    "cliphist",
+    "grim",
+    "slurp",
+    "swappy",
+    "wl-clipboard",
+]
+
+# Fonts and themes
+aesthetic_packages = [
+    "ttf-jetbrains-mono-nerd",
+    "ttf-font-awesome",
+    "noto-fonts",
+    "noto-fonts-emoji",
+    "noto-fonts-cjk",
+    "papirus-icon-theme",
+    "arc-gtk-theme",
+    "kvantum",
+    "qt5ct",
+    "qt6ct",
+]
+
+# Essential apps
+app_packages = [
+    "firefox",
+    "discord",
+    "spotify-launcher",
+    "vlc",
+    "mpv",
+    "imv",
+    "zathura",
+    "zathura-pdf-mupdf",
+    "btop",
+    "fastfetch",
+    "cava",
+]
+
+# Audio
+audio_packages = [
+    "pipewire",
+    "pipewire-alsa",
+    "pipewire-pulse",
+    "pipewire-jack",
+    "wireplumber",
+    "pavucontrol",
+]
+
+# Bluetooth
+bluetooth_packages = [
+    "bluez",
+    "bluez-utils",
+    "blueman",
+]
+
+pre_migration_hooks = [
+    "pacman-key --init",
+    "pacman-key --populate archlinux",
+]
+
+post_migration_hooks = [
+    "systemctl enable NetworkManager",
+    "systemctl enable bluetooth",
+    "systemctl --user enable pipewire",
+    "systemctl --user enable wireplumber",
+    "mkinitcpio -P",
+    "grub-mkconfig -o /boot/grub/grub.cfg",
+    "mkdir -p ~/.config/hypr",
+    "mkdir -p ~/.config/waybar",
+    "mkdir -p ~/.config/kitty",
+    "mkdir -p ~/.config/rofi",
+]
+
+[config_paths]
+network = "/etc/systemd/network/"
+services = "/etc/systemd/system/"
+users = "/etc/passwd"
+hypr = "~/.config/hypr/"
+waybar = "~/.config/waybar/"
+
+[package_mappings]
+"python3" = "python"
+"python3-pip" = "python-pip"
+
+[features]
+description = "Stunning Hyprland Wayland compositor with beautiful aesthetics"
+compositor = "Hyprland"
+display_protocol = "Wayland"
+bar = "Waybar"
+launcher = "Rofi"
+terminal = "Kitty"
+notifications = "Dunst"
+theme = "Arc Dark with Papirus icons"
+
+[default_config]
+# Beautiful Hyprland config will be generated
+animations = true
+blur = true
+shadows = true
+gaps_in = 5
+gaps_out = 10
+border_size = 2
+rounding = 10

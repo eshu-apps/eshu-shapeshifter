@@ -1,0 +1,129 @@
+# NixOS Distribution Profile
+# Declarative, reproducible system configuration with gorgeous GNOME setup
+
+name = "NixOS"
+version = "23.11"
+family = "Nix"
+
+[package_manager]
+name = "nix"
+install_cmd = "nix-env -iA nixos."
+remove_cmd = "nix-env -e"
+update_cmd = "nixos-rebuild switch --upgrade"
+search_cmd = "nix search nixpkgs"
+list_installed_cmd = "nix-env -q"
+
+init_system = "Systemd"
+
+base_packages = [
+    "nixos",
+    "nix",
+    "nixpkgs",
+]
+
+# GNOME Desktop (gorgeous setup)
+desktop_packages = [
+    "gnome.gnome-shell",
+    "gnome.gnome-terminal",
+    "gnome.nautilus",
+    "gnome.gnome-control-center",
+    "gnome.gnome-tweaks",
+    "gnomeExtensions.dash-to-dock",
+    "gnomeExtensions.blur-my-shell",
+    "gnomeExtensions.user-themes",
+    "gnomeExtensions.vitals",
+    "gnomeExtensions.appindicator",
+    "gnomeExtensions.clipboard-indicator",
+    "gnomeExtensions.just-perfection",
+    "gdm",
+]
+
+# Development tools
+dev_packages = [
+    "git",
+    "vim",
+    "neovim",
+    "vscode",
+    "gcc",
+    "gnumake",
+    "python3",
+    "nodejs",
+    "rustup",
+    "go",
+]
+
+# Beautiful themes
+theme_packages = [
+    "orchis-theme",
+    "papirus-icon-theme",
+    "bibata-cursors",
+]
+
+# Essential apps
+app_packages = [
+    "firefox",
+    "chromium",
+    "vlc",
+    "gimp",
+    "inkscape",
+    "libreoffice",
+    "thunderbird",
+    "discord",
+    "spotify",
+]
+
+# Utilities
+utility_packages = [
+    "htop",
+    "btop",
+    "neofetch",
+    "wget",
+    "curl",
+    "unzip",
+    "zip",
+    "tree",
+    "ripgrep",
+    "fd",
+    "fzf",
+    "bat",
+    "eza",
+]
+
+pre_migration_hooks = [
+    "curl -L https://nixos.org/nix/install | sh",
+    "nix-channel --add https://nixos.org/channels/nixos-23.11 nixos",
+    "nix-channel --update",
+]
+
+post_migration_hooks = [
+    "systemctl enable NetworkManager",
+    "systemctl enable gdm",
+    "nixos-rebuild switch",
+    "nix-collect-garbage -d",
+]
+
+[config_paths]
+network = "/etc/NetworkManager/"
+services = "/etc/systemd/system/"
+users = "/etc/passwd"
+nix_config = "/etc/nixos/configuration.nix"
+
+[package_mappings]
+# Traditional to Nix package names
+"python3" = "python3"
+"python-pip" = "python3Packages.pip"
+"nodejs" = "nodejs"
+"npm" = "nodePackages.npm"
+
+[features]
+description = "NixOS with gorgeous GNOME desktop and declarative configuration"
+desktop = "GNOME 45"
+declarative = true
+reproducible = true
+rollback_support = true
+theme = "Orchis Dark with Papirus icons"
+
+[nix_config]
+# Default NixOS configuration template
+experimental_features = ["nix-command", "flakes"]
+auto_optimise_store = true

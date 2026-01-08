@@ -1,0 +1,171 @@
+# Pop!_OS with COSMIC Desktop Profile
+# System76's next-gen Rust-based desktop environment
+
+name = "Pop!_OS COSMIC"
+version = "24.04"
+family = "Debian"
+
+[package_manager]
+name = "apt"
+install_cmd = "apt install -y"
+remove_cmd = "apt remove -y"
+update_cmd = "apt update && apt upgrade -y"
+search_cmd = "apt search"
+list_installed_cmd = "dpkg -l"
+
+init_system = "Systemd"
+
+base_packages = [
+    "pop-desktop",
+    "linux-generic",
+    "linux-headers-generic",
+    "network-manager",
+    "grub2",
+    "sudo",
+    "vim",
+    "git",
+]
+
+# COSMIC Desktop (Rust-based)
+cosmic_packages = [
+    "cosmic-session",
+    "cosmic-comp",
+    "cosmic-panel",
+    "cosmic-launcher",
+    "cosmic-workspaces",
+    "cosmic-applets",
+    "cosmic-settings",
+    "cosmic-files",
+    "cosmic-terminal",
+    "cosmic-edit",
+    "cosmic-store",
+    "pop-cosmic",
+]
+
+# Pop!_OS specific tools
+pop_packages = [
+    "pop-shop",
+    "pop-upgrade",
+    "system76-power",
+    "system76-driver",
+    "system76-scheduler",
+    "kernelstub",
+    "pop-default-settings",
+]
+
+# Development tools
+dev_packages = [
+    "build-essential",
+    "git",
+    "curl",
+    "wget",
+    "python3",
+    "python3-pip",
+    "nodejs",
+    "npm",
+    "rustc",
+    "cargo",
+    "code",
+]
+
+# Graphics and multimedia
+media_packages = [
+    "vlc",
+    "gimp",
+    "inkscape",
+    "blender",
+    "obs-studio",
+    "kdenlive",
+]
+
+# Gaming support
+gaming_packages = [
+    "steam",
+    "gamemode",
+    "mangohud",
+]
+
+# Fonts and themes
+aesthetic_packages = [
+    "fonts-firacode",
+    "fonts-jetbrains-mono",
+    "fonts-noto",
+    "fonts-noto-color-emoji",
+    "papirus-icon-theme",
+    "pop-fonts",
+]
+
+# Utilities
+utility_packages = [
+    "htop",
+    "btop",
+    "neofetch",
+    "tree",
+    "ripgrep",
+    "fd-find",
+    "fzf",
+    "bat",
+    "exa",
+    "tldr",
+]
+
+# Audio
+audio_packages = [
+    "pipewire",
+    "pipewire-audio",
+    "pipewire-pulse",
+    "wireplumber",
+    "pavucontrol",
+]
+
+pre_migration_hooks = [
+    # Add Pop!_OS repositories
+    "add-apt-repository -y ppa:system76/pop",
+    "add-apt-repository -y ppa:system76-dev/stable",
+    "wget -qO - https://apt.pop-os.org/proprietary/KEY.gpg | apt-key add -",
+    "echo 'deb http://apt.pop-os.org/proprietary jammy main' > /etc/apt/sources.list.d/pop-proprietary.list",
+    "apt update",
+]
+
+post_migration_hooks = [
+    "systemctl enable NetworkManager",
+    "systemctl enable system76-power",
+    "systemctl enable com.system76.CosmicComp",
+    "systemctl --user enable pipewire",
+    "systemctl --user enable wireplumber",
+    "update-grub",
+    "update-initramfs -u",
+    # Enable system76-scheduler for better performance
+    "systemctl enable system76-scheduler",
+    # Set COSMIC as default session
+    "update-alternatives --set x-session-manager /usr/bin/cosmic-session",
+]
+
+[config_paths]
+network = "/etc/NetworkManager/"
+services = "/etc/systemd/system/"
+users = "/etc/passwd"
+cosmic = "~/.config/cosmic/"
+
+[package_mappings]
+# Arch to Pop!_OS
+"python" = "python3"
+"python-pip" = "python3-pip"
+"base-devel" = "build-essential"
+
+[features]
+description = "Pop!_OS with next-gen COSMIC desktop (Rust-based)"
+desktop = "COSMIC"
+display_protocol = "Wayland"
+compositor = "cosmic-comp"
+written_in = "Rust"
+tiling_support = true
+auto_tiling = true
+performance_scheduler = true
+gaming_optimized = true
+theme = "Pop Dark with COSMIC styling"
+
+[performance_tweaks]
+scheduler = "system76-scheduler"
+power_management = "system76-power"
+cpu_governor = "schedutil"

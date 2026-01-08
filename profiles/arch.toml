@@ -1,0 +1,48 @@
+# Arch Linux Distribution Profile
+
+name = "Arch Linux"
+version = "rolling"
+family = "Arch"
+
+[package_manager]
+name = "pacman"
+install_cmd = "pacman -S --noconfirm"
+remove_cmd = "pacman -R --noconfirm"
+update_cmd = "pacman -Syu --noconfirm"
+search_cmd = "pacman -Ss"
+list_installed_cmd = "pacman -Q"
+
+init_system = "Systemd"
+
+base_packages = [
+    "base",
+    "linux",
+    "linux-firmware",
+    "base-devel",
+    "networkmanager",
+    "grub",
+    "sudo",
+    "vim",
+]
+
+pre_migration_hooks = [
+    "pacman-key --init",
+    "pacman-key --populate archlinux",
+]
+
+post_migration_hooks = [
+    "systemctl enable NetworkManager",
+    "mkinitcpio -P",
+    "grub-mkconfig -o /boot/grub/grub.cfg",
+]
+
+[config_paths]
+network = "/etc/systemd/network/"
+services = "/etc/systemd/system/"
+users = "/etc/passwd"
+
+[package_mappings]
+# Common package name variations
+"python3" = "python"
+"python3-pip" = "python-pip"
+"nodejs" = "nodejs"
