@@ -48,7 +48,7 @@ flate2 = "1.0"
 tar = "0.4"
 
 # Database for package mappings
-rusqlite = { version = "0.30", features = ["bundled"] }
+rusqlite = "0.30"
 
 # Regex
 regex = "1.10"
