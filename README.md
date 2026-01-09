@@ -5,6 +5,11 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Rust](https://img.shields.io/badge/rust-1.70%2B-orange.svg)](https://www.rust-lang.org/)
 [![Status](https://img.shields.io/badge/status-beta-blue.svg)](https://github.com/eshu-apps/eshu-shapeshifter)
+[![Website](https://img.shields.io/badge/🌐-eshu--apps.com-blue)](https://eshu-apps.com)
+
+**[💎 Get Subscription - $5.99/mo](https://gumroad.com/l/eshu-shapeshifter)** | **[📦 Get Shift Pack - $3.99](https://gumroad.com/l/eshu-shapeshifter)** | **[💝 Donate](https://gumroad.com/l/eshu-donate)**
+
+> 🎉 **2 FREE shapeshifts to try it out!**
 
 Transform your Linux distribution without reinstalling - migrate between distributions seamlessly while preserving your data, applications, and configurations.
 
@@ -413,12 +418,13 @@ MIT License - See LICENSE file for details
 - Inspired by the need for easier Linux distribution experimentation
 - Built with Rust for safety and performance
 
-## 📞 Support
+## 📞 Support & Contact
 
-- 📖 **Website**: https://eshuapps.com
-- 🐛 **Issues**: https://github.com/eshu-apps/eshu-shapeshifter/issues
-- 💬 **Discussions**: https://github.com/eshu-apps/eshu-shapeshifter/discussions
-- 📧 **Email**: support@eshu-apps.com
+- 🌐 **Website**: [eshu-apps.com](https://eshu-apps.com)
+- 📧 **Support**: support@eshu-apps.com
+- 🐛 **Bug Reports**: [GitHub Issues](https://github.com/eshu-apps/eshu-shapeshifter/issues)
+- 💬 **Discussions**: [GitHub Discussions](https://github.com/eshu-apps/eshu-shapeshifter/discussions)
+- 💝 **Donate**: [Support the Project](https://gumroad.com/l/eshu-donate)
 
 ---
 
