@@ -110,15 +110,19 @@ impl LicenseInfo {
                 }
             }
             LicenseType::Subscription { license_key } => {
+                // Clone the license_key to avoid borrow conflicts
+                let key = license_key.clone();
                 // Verify subscription is still active
-                self.verify_subscription(license_key).await
+                self.verify_subscription(&key).await
             }
             LicenseType::ShiftPack { license_key, shifts_remaining } => {
                 if *shifts_remaining > 0 {
                     Ok(true)
                 } else {
+                    // Clone the license_key to avoid borrow conflicts
+                    let key = license_key.clone();
                     // Check if they've purchased more packs
-                    self.refresh_shift_pack(license_key).await?;
+                    self.refresh_shift_pack(&key).await?;
                     Ok(self.get_shifts_remaining() > 0)
                 }
             }

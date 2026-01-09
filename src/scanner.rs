@@ -87,7 +87,7 @@ pub async fn show_status() -> anyhow::Result<()> {
         }
     }
 
-    println!("{}", "═══════════════════════════════════════════════════════════".dim());
+    println!("{}", "═══════════════════════════════════════════════════════════".dimmed());
     println!();
 
     // Show system state if available
