@@ -51,7 +51,8 @@ pub async fn shapeshift(target: String, custom_iso: Option<String>) -> anyhow::R
     println!("\n{}", "⚠️  WARNING: This will transform your system!".red().bold());
     println!("From: {} {}", current_state.distro, current_state.version);
     println!("To:   {} {}", target_profile.name, target_profile.version);
-    println!("\nA snapshot will be created for rollback.");
+    println!("\n{}", "✅ A snapshot will be created for rollback.".green());
+    println!("{}", "✅ You can revert anytime with: eshu-shapeshifter revert".green());
 
     let confirmed = Confirm::new()
         .with_prompt("Do you want to continue?")
@@ -63,12 +64,44 @@ pub async fn shapeshift(target: String, custom_iso: Option<String>) -> anyhow::R
         return Ok(());
     }
 
-    // Step 5: Create snapshot
+    // Step 5: Create snapshot (with validation)
     println!("\n{}", "Step 5: Creating system snapshot...".yellow().bold());
-    let snapshot = snapshot::create_snapshot(
+    let snapshot_result = snapshot::create_snapshot(
         format!("Before migration to {} {}", target_profile.name, target_profile.version)
-    ).await?;
-    println!("  {}", format!("✓ Snapshot created: {}", snapshot.id).green());
+    ).await;
+
+    let snapshot = match snapshot_result {
+        Ok(snap) => {
+            println!("  {}", format!("✓ Snapshot created: {}", snap.id).green());
+            
+            // Validate snapshot was actually created
+            if !snap.path.exists() {
+                eprintln!("  {}", "⚠️  Warning: Snapshot path doesn't exist!".yellow());
+                eprintln!("  {}", "Continuing anyway, but rollback may not work.".yellow());
+            } else {
+                println!("  {}", format!("✓ Snapshot validated at: {}", snap.path.display()).green());
+            }
+            
+            Some(snap)
+        }
+        Err(e) => {
+            eprintln!("  {}", format!("⚠️  Warning: Snapshot creation failed: {}", e).yellow());
+            eprintln!("  {}", "This means you won't be able to automatically rollback!".red().bold());
+            
+            let continue_anyway = Confirm::new()
+                .with_prompt("Continue without snapshot? (NOT RECOMMENDED)")
+                .default(false)
+                .interact()?;
+            
+            if !continue_anyway {
+                println!("{}", "Transformation cancelled for safety.".yellow());
+                return Ok(());
+            }
+            
+            eprintln!("  {}", "⚠️  Proceeding without snapshot protection!".red().bold());
+            None
+        }
+    };
 
     // Step 6: Prepare package translations
     println!("\n{}", "Step 6: Translating packages...".yellow().bold());
@@ -114,19 +147,47 @@ pub async fn shapeshift(target: String, custom_iso: Option<String>) -> anyhow::R
     preserve_home_directories(&current_state, &user_backup_dir)?;
     println!("  {}", "✓ User data backed up".green());
 
-    // Step 9: Execute migration
+    // Step 9: Execute migration (with error handling)
     println!("\n{}", "Step 9: Executing migration...".yellow().bold());
-    execute_migration(&current_state, &target_profile, &translation_result, &config_ops).await?;
+    let migration_result = execute_migration(&current_state, &target_profile, &translation_result, &config_ops).await;
+
+    match migration_result {
+        Ok(_) => {
+            println!("  {}", "✓ Migration completed successfully".green());
+        }
+        Err(e) => {
+            eprintln!("\n{}", "❌ Migration failed!".red().bold());
+            eprintln!("Error: {}", e);
+            
+            if let Some(ref snap) = snapshot {
+                eprintln!("\n{}", "🔄 You can rollback with:".yellow().bold());
+                eprintln!("  sudo eshu-shapeshifter revert {}", snap.id);
+            } else {
+                eprintln!("\n{}", "⚠️  No snapshot available for automatic rollback!".red().bold());
+                eprintln!("You may need to manually restore your system.");
+            }
+            
+            return Err(e);
+        }
+    }
 
     // Step 10: Record transformation
-    record_transformation(&current_state.distro, &target_profile.name, &snapshot.id)?;
+    if let Some(ref snap) = snapshot {
+        record_transformation(&current_state.distro, &target_profile.name, &snap.id)?;
+    } else {
+        record_transformation(&current_state.distro, &target_profile.name, "no-snapshot")?;
+    }
 
     println!("\n{}", "═══════════════════════════════════════════════".cyan());
     println!("{}", "✅ Transformation complete!".green().bold());
     println!("\n{}", "Next steps:".yellow().bold());
     println!("  1. Review the changes");
     println!("  2. Reboot your system");
-    println!("  3. If issues occur, use: eshu-shapeshifter revert {}", snapshot.id);
+    
+    if let Some(ref snap) = snapshot {
+        println!("  3. If issues occur, use: eshu-shapeshifter revert {}", snap.id);
+    }
+    
     println!("\n{}", "⚠️  IMPORTANT: Reboot required for changes to take effect!".red().bold());
 
     Ok(())
@@ -184,6 +245,56 @@ fn validate_migration_internal(
     // Check bootloader compatibility
     if current_state.boot_loader == "unknown" {
         println!("  {}", "⚠️  Could not detect bootloader - manual configuration may be needed".yellow());
+    }
+
+    // Check for sufficient disk space
+    match check_disk_space_for_migration() {
+        Ok(_) => println!("  {}", "✓ Sufficient disk space available".green()),
+        Err(e) => {
+            println!("  {}", format!("⚠️  Warning: {}", e).yellow());
+            println!("  {}", "Migration may fail if disk space is insufficient".yellow());
+        }
+    }
+
+    Ok(())
+}
+
+fn check_disk_space_for_migration() -> EshuResult<()> {
+    let output = Command::new("df")
+        .args(&["-B1", "/"])
+        .output()
+        .map_err(|e| EshuError::Validation(format!("Failed to check disk space: {}", e)))?;
+
+    if !output.status.success() {
+        return Err(EshuError::Validation("Failed to check disk space".to_string()));
+    }
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let lines: Vec<&str> = stdout.lines().collect();
+
+    if lines.len() < 2 {
+        return Err(EshuError::Validation("Could not parse disk space information".to_string()));
+    }
+
+    let parts: Vec<&str> = lines[1].split_whitespace().collect();
+    if parts.len() < 4 {
+        return Err(EshuError::Validation("Could not parse disk space information".to_string()));
+    }
+
+    let available_bytes: u64 = parts[3].parse()
+        .map_err(|_| EshuError::Validation("Could not parse available space".to_string()))?;
+
+    // Require at least 10GB free for migration
+    const MIN_SPACE_BYTES: u64 = 10 * 1024 * 1024 * 1024; // 10GB
+
+    if available_bytes < MIN_SPACE_BYTES {
+        let available_gb = available_bytes as f64 / (1024.0 * 1024.0 * 1024.0);
+        return Err(EshuError::Validation(
+            format!(
+                "Insufficient disk space. Need at least 10GB, but only {:.2}GB available",
+                available_gb
+            )
+        ));
     }
 
     Ok(())

@@ -127,10 +127,20 @@ fn check_disk_space(snapshot_dir: &PathBuf) -> EshuResult<()> {
 fn create_btrfs_snapshot(snapshot: &Snapshot) -> EshuResult<()> {
     println!("  Using btrfs snapshot (instant, copy-on-write)");
     
+    // First, try to find the root subvolume
+    let findmnt_output = Command::new("findmnt")
+        .args(&["-n", "-o", "SOURCE", "/"])
+        .output()
+        .map_err(|e| EshuError::Snapshot(format!("Failed to find root mount: {}", e)))?;
+    
+    let root_source = String::from_utf8_lossy(&findmnt_output.stdout).trim().to_string();
+    
+    // Create the snapshot
     let output = Command::new("btrfs")
         .args(&[
             "subvolume",
             "snapshot",
+            "-r", // Read-only snapshot for safety
             "/",
             snapshot.path.to_str().unwrap(),
         ])
@@ -138,10 +148,35 @@ fn create_btrfs_snapshot(snapshot: &Snapshot) -> EshuResult<()> {
         .map_err(|e| EshuError::Snapshot(format!("Btrfs snapshot failed: {}", e)))?;
     
     if !output.status.success() {
-        return Err(EshuError::Snapshot(
-            format!("Btrfs snapshot failed: {}", String::from_utf8_lossy(&output.stderr))
-        ));
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        
+        // If it's a "not a btrfs subvolume" error, try without the -r flag
+        if stderr.contains("not a btrfs") || stderr.contains("Invalid argument") {
+            println!("  Retrying without read-only flag...");
+            
+            let output2 = Command::new("btrfs")
+                .args(&[
+                    "subvolume",
+                    "snapshot",
+                    "/",
+                    snapshot.path.to_str().unwrap(),
+                ])
+                .output()
+                .map_err(|e| EshuError::Snapshot(format!("Btrfs snapshot failed: {}", e)))?;
+            
+            if !output2.status.success() {
+                return Err(EshuError::Snapshot(
+                    format!("Btrfs snapshot failed: {}", String::from_utf8_lossy(&output2.stderr))
+                ));
+            }
+        } else {
+            return Err(EshuError::Snapshot(
+                format!("Btrfs snapshot failed: {}", stderr)
+            ));
+        }
     }
+    
+    println!("  {}", "✓ Btrfs snapshot created successfully".green());
     
     Ok(())
 }
@@ -174,6 +209,8 @@ fn create_lvm_snapshot(snapshot: &Snapshot) -> EshuResult<()> {
             format!("LVM snapshot failed: {}", String::from_utf8_lossy(&output.stderr))
         ));
     }
+    
+    println!("  {}", "✓ LVM snapshot created successfully".green());
     
     Ok(())
 }
@@ -306,6 +343,13 @@ pub async fn list_snapshots() -> anyhow::Result<()> {
         println!("  {}: {} {}", "Distro".yellow(), snapshot.distro_name, snapshot.distro_version);
         println!("  {}: {}", "Description".yellow(), snapshot.description);
         println!("  {}: {:?}", "Type".yellow(), snapshot.snapshot_type);
+        
+        // Check if snapshot path exists
+        if snapshot.path.exists() {
+            println!("  {}: {}", "Status".yellow(), "✓ Available".green());
+        } else {
+            println!("  {}: {}", "Status".yellow(), "⚠️  Path missing".red());
+        }
     }
     
     Ok(())
@@ -359,6 +403,14 @@ pub async fn revert_snapshot(snapshot_id: Option<String>) -> anyhow::Result<()> 
         snapshots.into_iter().nth(selection).unwrap()
     };
     
+    // Verify snapshot exists
+    if !snapshot.path.exists() {
+        println!("{}", "❌ Snapshot path does not exist!".red().bold());
+        println!("Expected at: {}", snapshot.path.display());
+        println!("The snapshot may have been deleted or moved.");
+        return Ok(());
+    }
+    
     // Confirm
     println!("\n{}", "⚠️  WARNING: This will revert your system!".red().bold());
     println!("Target snapshot: {} - {} {}", 
@@ -366,6 +418,7 @@ pub async fn revert_snapshot(snapshot_id: Option<String>) -> anyhow::Result<()> 
         snapshot.distro_name, 
         snapshot.distro_version
     );
+    println!("Snapshot type: {:?}", snapshot.snapshot_type);
     
     let confirmed = Confirm::new()
         .with_prompt("Are you sure you want to continue?")
@@ -380,14 +433,24 @@ pub async fn revert_snapshot(snapshot_id: Option<String>) -> anyhow::Result<()> 
     // Perform revert
     println!("{}", "\n🔄 Reverting system...".cyan().bold());
     
-    match snapshot.snapshot_type {
-        SnapshotType::Btrfs => revert_btrfs_snapshot(&snapshot)?,
-        SnapshotType::LVM => revert_lvm_snapshot(&snapshot)?,
-        SnapshotType::Rsync => revert_rsync_snapshot(&snapshot)?,
-    }
+    let revert_result = match snapshot.snapshot_type {
+        SnapshotType::Btrfs => revert_btrfs_snapshot(&snapshot),
+        SnapshotType::LVM => revert_lvm_snapshot(&snapshot),
+        SnapshotType::Rsync => revert_rsync_snapshot(&snapshot),
+    };
     
-    println!("{}", "\n✅ System reverted successfully!".green().bold());
-    println!("{}", "⚠️  Please reboot your system for changes to take effect.".yellow());
+    match revert_result {
+        Ok(_) => {
+            println!("{}", "\n✅ System reverted successfully!".green().bold());
+            println!("{}", "⚠️  Please reboot your system for changes to take effect.".yellow());
+        }
+        Err(e) => {
+            eprintln!("{}", "\n❌ Revert failed!".red().bold());
+            eprintln!("Error: {}", e);
+            eprintln!("\n{}", "Manual recovery may be required.".yellow());
+            return Err(e.into());
+        }
+    }
     
     Ok(())
 }
@@ -395,55 +458,44 @@ pub async fn revert_snapshot(snapshot_id: Option<String>) -> anyhow::Result<()> 
 fn revert_btrfs_snapshot(snapshot: &Snapshot) -> EshuResult<()> {
     println!("  Reverting btrfs snapshot...");
 
-    // IMPORTANT: Btrfs snapshot revert requires special handling
-    // The proper approach is to:
-    // 1. Boot from a live USB/rescue environment
-    // 2. Mount the btrfs filesystem
-    // 3. Use btrfs subvolume set-default to switch to the snapshot
-    // 4. Reboot
-    //
-    // This cannot be done safely from within the running system.
-    // For now, we'll create a script that can be run from a rescue environment.
-
-    let script_path = PathBuf::from("/root/eshu-revert-btrfs.sh");
-    let script_content = format!(
-        "#!/bin/bash\n\
-         # Eshu Shapeshifter Btrfs Revert Script\n\
-         # Run this from a live USB/rescue environment\n\
-         \n\
-         echo 'Mounting btrfs root...'\n\
-         mkdir -p /mnt/btrfs\n\
-         mount -o subvolid=5 /dev/YOUR_ROOT_DEVICE /mnt/btrfs\n\
-         \n\
-         echo 'Setting snapshot as default subvolume...'\n\
-         btrfs subvolume set-default {}/@ /mnt/btrfs\n\
-         \n\
-         echo 'Done! Unmount and reboot.'\n\
-         umount /mnt/btrfs\n",
-        snapshot.path.display()
-    );
-
-    std::fs::write(&script_path, script_content)
-        .map_err(|e| EshuError::Snapshot(format!("Failed to create revert script: {}", e)))?;
-
-    // Make script executable
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut perms = std::fs::metadata(&script_path)?.permissions();
-        perms.set_mode(0o755);
-        std::fs::set_permissions(&script_path, perms)?;
+    // For btrfs, we need to handle this carefully
+    // The safest approach is to provide instructions rather than attempting automatic revert
+    
+    println!("\n{}", "⚠️  IMPORTANT: Btrfs snapshot revert requires special handling!".yellow().bold());
+    println!("\n{}", "Automatic btrfs revert from a running system is not safe.".yellow());
+    println!("{}", "Here are your options:".green().bold());
+    println!("\n{}", "Option 1: Boot from snapshot (Recommended)".cyan().bold());
+    println!("  1. Reboot your system");
+    println!("  2. At the bootloader, select the snapshot subvolume");
+    println!("  3. If using GRUB, you may need to regenerate config:");
+    println!("     sudo grub-mkconfig -o /boot/grub/grub.cfg");
+    
+    println!("\n{}", "Option 2: Manual revert from live USB".cyan().bold());
+    println!("  1. Boot from a live USB");
+    println!("  2. Mount your btrfs filesystem:");
+    println!("     sudo mount -o subvolid=5 /dev/sdXY /mnt");
+    println!("  3. Set the snapshot as default:");
+    println!("     sudo btrfs subvolume set-default {} /mnt", snapshot.path.display());
+    println!("  4. Unmount and reboot:");
+    println!("     sudo umount /mnt && sudo reboot");
+    
+    println!("\n{}", "Option 3: Copy snapshot contents (Slower but safer)".cyan().bold());
+    println!("  The rsync method below will be used instead.");
+    
+    let use_rsync = Confirm::new()
+        .with_prompt("Use rsync to copy snapshot contents? (slower but works from running system)")
+        .default(true)
+        .interact()
+        .unwrap_or(false);
+    
+    if use_rsync {
+        println!("\n  Falling back to rsync method...");
+        return revert_rsync_snapshot(snapshot);
     }
-
-    println!("  ⚠️  IMPORTANT: Btrfs snapshot revert requires manual steps!");
-    println!("  1. Reboot into a live USB/rescue environment");
-    println!("  2. Run the script at: {}", script_path.display());
-    println!("  3. Edit the script to set YOUR_ROOT_DEVICE (e.g., /dev/sda1)");
-    println!("  4. Execute the script as root");
-    println!("  5. Reboot into the restored system");
-
+    
+    println!("\n{}", "Revert cancelled. Please follow the manual steps above.".yellow());
     Err(EshuError::Snapshot(
-        "Btrfs revert requires manual steps from rescue environment. See script at /root/eshu-revert-btrfs.sh".to_string()
+        "Btrfs revert requires manual steps or rsync fallback".to_string()
     ))
 }
 
@@ -452,6 +504,19 @@ fn revert_lvm_snapshot(snapshot: &Snapshot) -> EshuResult<()> {
     
     let snapshot_name = format!("{}_lv", snapshot.id);
     
+    // Check if LVM snapshot exists
+    let check_output = Command::new("lvdisplay")
+        .arg(&snapshot_name)
+        .output()
+        .map_err(|e| EshuError::Snapshot(format!("Failed to check LVM snapshot: {}", e)))?;
+    
+    if !check_output.status.success() {
+        return Err(EshuError::Snapshot(
+            format!("LVM snapshot '{}' not found", snapshot_name)
+        ));
+    }
+    
+    println!("  Merging LVM snapshot...");
     let output = Command::new("lvconvert")
         .args(&["--merge", &snapshot_name])
         .output()
@@ -463,11 +528,15 @@ fn revert_lvm_snapshot(snapshot: &Snapshot) -> EshuResult<()> {
         ));
     }
     
+    println!("  {}", "✓ LVM snapshot merge initiated".green());
+    println!("  {}", "Note: Merge will complete on next reboot".yellow());
+    
     Ok(())
 }
 
 fn revert_rsync_snapshot(snapshot: &Snapshot) -> EshuResult<()> {
     println!("  Reverting rsync backup...");
+    println!("  {}", "⚠️  This will overwrite current system files!".yellow());
     
     let pb = ProgressBar::new_spinner();
     pb.set_style(
@@ -490,7 +559,7 @@ fn revert_rsync_snapshot(snapshot: &Snapshot) -> EshuResult<()> {
             .args(&[
                 "-aAXv",
                 "--delete",
-                entry.path().to_str().unwrap(),
+                &format!("{}/", entry.path().display()), // Trailing slash important!
                 target.to_str().unwrap(),
             ])
             .output()
@@ -499,7 +568,9 @@ fn revert_rsync_snapshot(snapshot: &Snapshot) -> EshuResult<()> {
         if !output.status.success() {
             pb.finish_with_message("Failed");
             return Err(EshuError::Snapshot(
-                format!("Rsync restore failed: {}", String::from_utf8_lossy(&output.stderr))
+                format!("Rsync restore failed for /{}: {}", 
+                    dir_name.to_string_lossy(),
+                    String::from_utf8_lossy(&output.stderr))
             ));
         }
     }
