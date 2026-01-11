@@ -12,9 +12,10 @@ use indicatif::{ProgressBar, ProgressStyle};
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
+use std::io::{self, IsTerminal};
 
 /// Main shapeshift function - transform the system to a different distro
-pub async fn shapeshift(target: String, custom_iso: Option<String>) -> anyhow::Result<()> {
+pub async fn shapeshift(target: String, custom_iso: Option<String>, auto_yes: bool) -> anyhow::Result<()> {
     println!("{}", "\n🔮 Eshu Shapeshifter - System Transformation".cyan().bold());
     println!("{}", "═══════════════════════════════════════════════".cyan());
 
@@ -54,10 +55,38 @@ pub async fn shapeshift(target: String, custom_iso: Option<String>) -> anyhow::R
     println!("\n{}", "✅ A snapshot will be created for rollback.".green());
     println!("{}", "✅ You can revert anytime with: eshu-shapeshifter revert".green());
 
-    let confirmed = Confirm::new()
-        .with_prompt("Do you want to continue?")
-        .default(false)
-        .interact()?;
+    let confirmed = if auto_yes {
+        println!("\n{}", "Auto-accepting (--yes flag provided)".yellow());
+        true
+    } else {
+        // Check if we have a terminal
+        if !io::stdin().is_terminal() {
+            eprintln!("\n{}", "❌ Error: Not running in an interactive terminal!".red().bold());
+            eprintln!("{}", "This command requires user confirmation.".yellow());
+            eprintln!("\n{}", "Solutions:".cyan().bold());
+            eprintln!("  1. Run with --yes flag to skip confirmation:");
+            eprintln!("     {}", "sudo eshu-shapeshifter shapeshift openSUSE --yes".green());
+            eprintln!("  2. Run in an interactive terminal (not via script/pipe)");
+            return Err(anyhow::anyhow!("Not running in interactive terminal. Use --yes flag to proceed."));
+        }
+
+        match Confirm::new()
+            .with_prompt("Do you want to continue?")
+            .default(false)
+            .interact()
+        {
+            Ok(result) => result,
+            Err(e) => {
+                eprintln!("\n{}", "❌ Error: Failed to get user confirmation!".red().bold());
+                eprintln!("Error details: {}", e);
+                eprintln!("\n{}", "Solutions:".cyan().bold());
+                eprintln!("  1. Run with --yes flag to skip confirmation:");
+                eprintln!("     {}", "sudo eshu-shapeshifter shapeshift openSUSE --yes".green());
+                eprintln!("  2. Ensure you're running in a proper terminal (not via script/pipe)");
+                return Err(anyhow::anyhow!("Failed to get user confirmation. Use --yes flag to proceed."));
+            }
+        }
+    };
 
     if !confirmed {
         println!("{}", "Transformation cancelled.".yellow());
@@ -88,10 +117,30 @@ pub async fn shapeshift(target: String, custom_iso: Option<String>) -> anyhow::R
             eprintln!("  {}", format!("⚠️  Warning: Snapshot creation failed: {}", e).yellow());
             eprintln!("  {}", "This means you won't be able to automatically rollback!".red().bold());
             
-            let continue_anyway = Confirm::new()
-                .with_prompt("Continue without snapshot? (NOT RECOMMENDED)")
-                .default(false)
-                .interact()?;
+            let continue_anyway = if auto_yes {
+                println!("  {}", "Auto-accepting to continue without snapshot (--yes flag)".yellow());
+                true
+            } else {
+                if !io::stdin().is_terminal() {
+                    eprintln!("\n{}", "❌ Error: Cannot prompt for confirmation (not a terminal)".red().bold());
+                    eprintln!("Use --yes flag to proceed without snapshot (NOT RECOMMENDED)");
+                    return Err(anyhow::anyhow!("Snapshot creation failed and cannot prompt for confirmation"));
+                }
+
+                match Confirm::new()
+                    .with_prompt("Continue without snapshot? (NOT RECOMMENDED)")
+                    .default(false)
+                    .interact()
+                {
+                    Ok(result) => result,
+                    Err(e) => {
+                        eprintln!("\n{}", "❌ Error: Failed to get confirmation!".red().bold());
+                        eprintln!("Error: {}", e);
+                        eprintln!("Use --yes flag to proceed without snapshot (NOT RECOMMENDED)");
+                        return Err(anyhow::anyhow!("Failed to get confirmation"));
+                    }
+                }
+            };
             
             if !continue_anyway {
                 println!("{}", "Transformation cancelled for safety.".yellow());
@@ -162,6 +211,8 @@ pub async fn shapeshift(target: String, custom_iso: Option<String>) -> anyhow::R
             if let Some(ref snap) = snapshot {
                 eprintln!("\n{}", "🔄 You can rollback with:".yellow().bold());
                 eprintln!("  sudo eshu-shapeshifter revert {}", snap.id);
+                eprintln!("\n{}", "Or list all snapshots with:".yellow());
+                eprintln!("  sudo eshu-shapeshifter snapshots");
             } else {
                 eprintln!("\n{}", "⚠️  No snapshot available for automatic rollback!".red().bold());
                 eprintln!("You may need to manually restore your system.");

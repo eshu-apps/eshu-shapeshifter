@@ -45,13 +45,13 @@ async fn main() -> Result<()> {
         Commands::List => {
             repository::list_available_distros().await?;
         }
-        Commands::Shapeshift { target, custom_iso } => {
+        Commands::Shapeshift { target, custom_iso, yes } => {
             // Check license before allowing shapeshift
             if !license::check_license_and_prompt().await? {
                 std::process::exit(1);
             }
 
-            migration::shapeshift(target, custom_iso).await?;
+            migration::shapeshift(target, custom_iso, yes).await?;
 
             // Record usage after successful shapeshift
             let mut license_info = license::LicenseInfo::load()?;

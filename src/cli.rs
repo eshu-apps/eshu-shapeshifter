@@ -30,6 +30,10 @@ pub enum Commands {
         /// Optional: Path to custom ISO file
         #[arg(short, long)]
         custom_iso: Option<String>,
+
+        /// Skip confirmation prompts (auto-accept)
+        #[arg(short, long)]
+        yes: bool,
     },
 
     /// Revert to a previous snapshot

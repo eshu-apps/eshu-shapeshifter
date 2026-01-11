@@ -23,15 +23,35 @@ pub async fn create_snapshot(description: String) -> EshuResult<Snapshot> {
         check_disk_space(&config.snapshot_dir)?;
     }
     
-    let snapshot_id = format!("snapshot_{}", chrono::Utc::now().timestamp());
+    // Generate unique snapshot ID with random suffix to avoid collisions
+    let timestamp = chrono::Utc::now().timestamp();
+    let random_suffix = format!("{:04x}", rand::random::<u16>());
+    let snapshot_id = format!("snapshot_{}_{}", timestamp, random_suffix);
     let snapshot_path = config.snapshot_dir.join(&snapshot_id);
     
-    std::fs::create_dir_all(&snapshot_path)
-        .map_err(|e| EshuError::Snapshot(format!("Failed to create snapshot directory: {}", e)))?;
+    // Check if snapshot already exists (shouldn't happen with random suffix, but be safe)
+    if snapshot_path.exists() {
+        println!("  {}", "⚠️  Snapshot path already exists, generating new ID...".yellow());
+        let random_suffix2 = format!("{:04x}", rand::random::<u16>());
+        let snapshot_id = format!("snapshot_{}_{}", timestamp, random_suffix2);
+        let snapshot_path = config.snapshot_dir.join(&snapshot_id);
+        
+        if snapshot_path.exists() {
+            return Err(EshuError::Snapshot(
+                "Failed to generate unique snapshot ID after retries".to_string()
+            ));
+        }
+    }
+    
+    // For btrfs, don't create the directory - btrfs will do it
+    if !matches!(snapshot_type, SnapshotType::Btrfs) {
+        std::fs::create_dir_all(&snapshot_path)
+            .map_err(|e| EshuError::Snapshot(format!("Failed to create snapshot directory: {}", e)))?;
+    }
     
     let snapshot = Snapshot {
         id: snapshot_id.clone(),
-        timestamp: chrono::Utc::now().timestamp(),
+        timestamp,
         distro_name: distro,
         distro_version: version,
         description,

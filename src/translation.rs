@@ -324,14 +324,63 @@ fn systemd_to_debian_network(content: &str) -> String {
 
 /// Preserve user home directories
 pub fn preserve_home_directories(state: &SystemState, backup_dir: &Path) -> EshuResult<()> {
+    // Ensure backup directory exists
+    fs::create_dir_all(backup_dir)?;
+    
+    let mut preserved_count = 0;
+    let mut skipped_count = 0;
+    
     for user in &state.users {
-        if user.home.exists() && user.uid >= 1000 {
-            let backup_path = backup_dir.join(format!("home_{}", user.name));
-            fs::create_dir_all(&backup_path)?;
-            
-            // Copy user home directory
-            copy_dir_recursive(&user.home, &backup_path)?;
+        // Only backup regular users (UID >= 1000) and skip system users
+        if user.uid < 1000 {
+            continue;
         }
+        
+        // Check if home directory exists
+        if !user.home.exists() {
+            println!("  ⚠️  Skipping {}: home directory doesn't exist ({})", 
+                user.name, user.home.display());
+            skipped_count += 1;
+            continue;
+        }
+        
+        // Check if home directory is accessible
+        if let Err(e) = fs::read_dir(&user.home) {
+            println!("  ⚠️  Skipping {}: cannot access home directory ({})", 
+                user.name, e);
+            skipped_count += 1;
+            continue;
+        }
+        
+        let backup_path = backup_dir.join(format!("home_{}", user.name));
+        
+        // Create backup directory
+        if let Err(e) = fs::create_dir_all(&backup_path) {
+            println!("  ⚠️  Skipping {}: failed to create backup directory ({})", 
+                user.name, e);
+            skipped_count += 1;
+            continue;
+        }
+        
+        // Copy user home directory
+        match copy_dir_recursive(&user.home, &backup_path) {
+            Ok(_) => {
+                println!("  ✓ Preserved home directory for user: {}", user.name);
+                preserved_count += 1;
+            }
+            Err(e) => {
+                println!("  ⚠️  Partial backup for {}: {} (continuing anyway)", 
+                    user.name, e);
+                // Don't fail the whole operation, just warn
+                skipped_count += 1;
+            }
+        }
+    }
+    
+    if preserved_count == 0 && skipped_count == 0 {
+        println!("  ℹ️  No user home directories to preserve");
+    } else {
+        println!("  Summary: {} preserved, {} skipped", preserved_count, skipped_count);
     }
     
     Ok(())
@@ -348,10 +397,30 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
         let path = entry.path();
         let dest_path = dst.join(entry.file_name());
         
+        // Skip certain directories that are large or unnecessary
+        let filename = entry.file_name();
+        let filename_str = filename.to_string_lossy();
+        if filename_str == ".cache" 
+            || filename_str == ".local/share/Trash"
+            || filename_str == ".thumbnails"
+            || filename_str == ".mozilla/firefox/*/Cache"
+            || filename_str == ".config/google-chrome/*/Cache"
+        {
+            continue;
+        }
+        
         if path.is_dir() {
-            copy_dir_recursive(&path, &dest_path)?;
+            // Recursively copy subdirectories, but catch errors to continue
+            if let Err(e) = copy_dir_recursive(&path, &dest_path) {
+                eprintln!("    Warning: Failed to copy {}: {}", path.display(), e);
+                // Continue with other files
+            }
         } else {
-            fs::copy(&path, &dest_path)?;
+            // Copy file, but catch errors to continue
+            if let Err(e) = fs::copy(&path, &dest_path) {
+                eprintln!("    Warning: Failed to copy {}: {}", path.display(), e);
+                // Continue with other files
+            }
         }
     }
     
